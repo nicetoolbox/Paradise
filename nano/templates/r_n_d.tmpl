@@ -56,9 +56,9 @@
 					<div class='line'>
 						{{for data.disk_data.lathe_types}}
 							{{if index == 0}}
-								Lathe Types: 
+								Lathe Types:
 							{{else}}
-								, 
+								,
 							{{/if}}
 							{{:value}}
 						{{/for}}
@@ -100,7 +100,7 @@
 				<div class='item'>
 					<div class='itemLabelWide'>* {{:value.name}}:</div>
 					<div class='itemLabelNarrow'>
-						{{:value.object_level}} 
+						{{:value.object_level}}
 						{{if value.current_level}}
 							(Current: {{:value.current_level}})
 						{{/if}}
@@ -121,7 +121,7 @@
 		{{else data.submenu == 3}}
 			<h3>Chemical Storage:</h3>
 		{{/if}}
-		
+
 		{{if data.submenu < 2}}
 			<div class='itemLabelWidest'><table>
 				<tr>
@@ -138,7 +138,7 @@
 				</tr>
 			</table></div>
 		{{/if}}
-		
+
 		{{if data.submenu == 0}}
 			<form action='byond://'>
 				<input type='hidden' name='src' value='{{:data.src_ref}}'>
@@ -146,7 +146,7 @@
 				<input type='text' name='to_search'>
 				<input type='submit' value='Search'>
 			</form>
-			
+
 			<hr>
 			<table class='item'><tr>
 				{{for data.categories}}
@@ -169,7 +169,7 @@
 						{{/if}}</td>
 						<td>
 							{{for value.materials : material : i}}
-								 | 
+								 |
 								{{if material.is_red}}
 									<span class='bad'>
 								{{/if}}
@@ -185,7 +185,8 @@
 		{{else data.submenu == 2}}
 			{{for data.loaded_materials}}
 				<div class='item'>
-					<div class='itemLabel'>* {{:value.amount}} of {{:value.name}}</div> <div class='itemLabelNarrow'>({{:Math.round((value.amount / 2000) * 10) / 10}} sheets)</div>
+					<div class='itemLabel'>* {{:value.amount}} of {{:value.name}}</div>
+					<div class='itemLabelNarrow'>({{:Math.round((value.amount / 2000) * 10) / 10}} sheets)</div>
 					{{if value.amount >= 2000}}
 						{{if data.menu == 4}}
 							{{:helper.link('1x', 'eject', {'lathe_ejectsheet': value.id, 'lathe_ejectsheet_amt': 1})}}
@@ -207,7 +208,7 @@
 			{{/for}}
 		{{else data.submenu == 3}}
 			<div class='item'>
-				
+
 				{{:helper.link('Purge All', 'trash', data.menu == 4 ? {'disposeallP': 1} : {'disposeallI' : 1})}}
 			</div>
 			{{for data.loaded_chemicals}}

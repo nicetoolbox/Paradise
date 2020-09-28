@@ -186,7 +186,7 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 		to_chat(user, "<span class='notice'>You add the disk to the machine!</span>")
 	else if(!(linked_destroy && linked_destroy.busy) && !(linked_lathe && linked_lathe.busy) && !(linked_imprinter && linked_imprinter.busy))
 		..()
-	SSnanoui.update_uis(src)
+	//SSnanoui.update_uis(src) todo..?
 	return
 
 /obj/machinery/computer/rdconsole/emag_act(user as mob)
@@ -196,24 +196,26 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 		emagged = 1
 		to_chat(user, "<span class='notice'>You disable the security protocols</span>")
 
-/obj/machinery/computer/rdconsole/Topic(href, href_list)
+/obj/machinery/computer/rdconsole/tgui_act(action, list/params)
 	if(..())
-		return 1
+		return FALSE
 
 	if(!allowed(usr) && !isobserver(usr))
-		return 1
+		return FALSE
 
 	add_fingerprint(usr)
 
 	usr.set_machine(src)
-	if(href_list["menu"]) //Switches menu screens. Converts a sent text string into a number. Saves a LOT of code.
-		var/temp_screen = text2num(href_list["menu"])
-		menu = temp_screen
-	if(href_list["submenu"]) //Switches menu screens. Converts a sent text string into a number. Saves a LOT of code.
-		var/temp_screen = text2num(href_list["submenu"])
-		submenu = temp_screen
+	if(action == "nav") //Switches menu screens. Converts a sent text string into a number. Saves a LOT of code.
+		var/next_menu = text2num(params["menu"])
+		var/next_submenu = text2num(params["submenu"]) // todo allow not passing one?
+		menu = next_menu
+		submenu = next_submenu
 
-	if(href_list["category"])
+		return TRUE
+
+	if(action == "setCategory")
+		var/next_category = params["category"] // todo validate categroy?
 		var/compare
 
 		matching_designs.Cut()
@@ -227,59 +229,66 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 			var/datum/design/D = files.known_designs[v]
 			if(!(D.build_type & compare))
 				continue
-			if(href_list["category"] in D.category)
+			if(next_category in D.category)
 				matching_designs.Add(D)
 		submenu = 1
 
-		selected_category = "Viewing Category [href_list["category"]]"
+		selected_category = "Viewing Category [next_category]"
 
-	else if(href_list["updt_tech"]) //Update the research holder with information from the technology disk.
+		return TRUE
+
+	if(action == "updt_tech") //Update the research holder with information from the technology disk.
 		add_wait_message("Updating Database...", TECH_UPDATE_DELAY)
 		spawn(TECH_UPDATE_DELAY)
 			clear_wait_message()
 			files.AddTech2Known(t_disk.stored)
-			SSnanoui.update_uis(src)
 			griefProtection() //Update centcom too
+		return TRUE
 
-	else if(href_list["clear_tech"]) //Erase data on the technology disk.
+	if(action == "clear_tech") //Erase data on the technology disk.
 		if(t_disk)
 			t_disk.wipe_tech()
+		return TRUE
 
-	else if(href_list["eject_tech"]) //Eject the technology disk.
+	if(action == "eject_tech") //Eject the technology disk.
 		if(t_disk)
 			t_disk.loc = src.loc
 			t_disk = null
 		menu = 0
 		submenu = 0
+		return TRUE
 
-	else if(href_list["copy_tech"]) //Copy some technology data from the research holder to the disk.
+	if(action == "copy_tech") //Copy some technology data from the research holder to the disk.
 		// Somehow this href makes me very nervous
-		t_disk.stored = files.known_tech[href_list["copy_tech_ID"]]
+		t_disk.stored = files.known_tech[params["id"]]
 		menu = 2
 		submenu = 0
+		return TRUE
 
-	else if(href_list["updt_design"]) //Updates the research holder with design data from the design disk.
+	if(action == "updt_design") //Updates the research holder with design data from the design disk.
 		add_wait_message("Updating Database...", DESIGN_UPDATE_DELAY)
 		spawn(DESIGN_UPDATE_DELAY)
 			clear_wait_message()
 			files.AddDesign2Known(d_disk.blueprint)
-			SSnanoui.update_uis(src)
 			griefProtection() //Update centcom too
+		return TRUE
 
-	else if(href_list["clear_design"]) //Erases data on the design disk.
+	if(action == "clear_design") //Erases data on the design disk.
 		if(d_disk)
 			d_disk.wipe_blueprint()
+		return TRUE
 
-	else if(href_list["eject_design"]) //Eject the design disk.
+	if(action == "eject_design") //Eject the design disk.
 		if(d_disk)
 			d_disk.loc = src.loc
 			d_disk = null
 		menu = 0
 		submenu = 0
+		return TRUE
 
-	else if(href_list["copy_design"]) //Copy design data from the research holder to the design disk.
+	if(action == "copy_design") //Copy design data from the research holder to the design disk.
 		// This href ALSO makes me very nervous
-		var/datum/design/D = files.known_designs[href_list["copy_design_ID"]]
+		var/datum/design/D = files.known_designs[params["id"]]
 		if(D)
 			// eeeeeep design datums are global be careful!
 			var/autolathe_friendly = 1
@@ -296,8 +305,9 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 			d_disk.blueprint = D
 		menu = 2
 		submenu = 0
+		return TRUE
 
-	else if(href_list["eject_item"]) //Eject the item inside the destructive analyzer.
+	if(action == "eject_item") //Eject the item inside the destructive analyzer.
 		if(linked_destroy)
 			if(linked_destroy.busy)
 				to_chat(usr, "<span class='danger'> The destructive analyzer is busy at the moment.</span>")
@@ -307,8 +317,9 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 				linked_destroy.loaded_item = null
 				linked_destroy.icon_state = "d_analyzer"
 				menu = 3
+		return TRUE
 
-	else if(href_list["maxresearch"]) //Eject the item inside the destructive analyzer.
+	if(action == "maxresearch") //Eject the item inside the destructive analyzer.
 		if(!check_rights(R_ADMIN))
 			return
 		if(alert("Are you sure you want to maximize research levels?","Confirmation","Yes","No")=="No")
@@ -316,10 +327,10 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 		log_admin("[key_name(usr)] has maximized the research levels.")
 		message_admins("[key_name_admin(usr)] has maximized the research levels.")
 		Maximize()
-		SSnanoui.update_uis(src)
 		griefProtection() //Update centcomm too
+		return TRUE
 
-	else if(href_list["deconstruct"]) //Deconstruct the item in the destructive analyzer and update the research holder.
+	if(action == "deconstruct") //Deconstruct the item in the destructive analyzer and update the research holder.
 		if(linked_destroy)
 			if(linked_destroy.busy)
 				to_chat(usr, "<span class='danger'>The destructive analyzer is busy at the moment.</span>")
@@ -336,7 +347,6 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 					return
 			linked_destroy.busy = 1
 			add_wait_message("Processing and Updating Database...", DECONSTRUCT_DELAY)
-			SSnanoui.update_uis(src)
 			flick("d_analyzer_process", linked_destroy)
 			spawn(DECONSTRUCT_DELAY)
 				clear_wait_message()
@@ -379,9 +389,9 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 								qdel(I)
 								linked_destroy.icon_state = "d_analyzer"
 					use_power(250)
-					SSnanoui.update_uis(src)
+		return TRUE
 
-	else if(href_list["sync"]) //Sync the research holder with all the R&D consoles in the game that aren't sync protected.
+	if(action == "sync") //Sync the research holder with all the R&D consoles in the game that aren't sync protected.
 		if(!sync)
 			to_chat(usr, "<span class='danger'>You must connect to the network first!</span>")
 		else
@@ -402,22 +412,23 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 							server_processed = 1
 						if(!istype(S, /obj/machinery/r_n_d/server/centcom) && server_processed)
 							S.produce_heat(100)
-					SSnanoui.update_uis(src)
+		return TRUE
 
-	else if(href_list["togglesync"]) //Prevents the console from being synced by other consoles. Can still send data.
+	if(action == "togglesync") //Prevents the console from being synced by other consoles. Can still send data.
 		sync = !sync
+		return TRUE
 
-	else if(href_list["build"]) //Causes the Protolathe to build something.
+	if(action == "build") //Causes the Protolathe to build something.
 		if(linked_lathe)
 			if(linked_lathe.busy)
 				to_chat(usr, "<span class='danger'>Protolathe is busy at the moment.</span>")
-				return
+				return TRUE
 			var/coeff = linked_lathe.efficiency_coeff
 			var/g2g = 1
-			var/datum/design/being_built = files.known_designs[href_list["build"]]
+			var/datum/design/being_built = files.known_designs[params["id"]]
 			if(being_built)
 				var/power = 2000
-				var/amount=text2num(href_list["amount"])
+				var/amount=text2num(params["amount"])
 				if(being_built.make_reagents.len)
 					return 0
 				amount = max(1, min(10, amount))
@@ -484,9 +495,9 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 									new_item.loc = linked_lathe.loc
 						clear_wait_message()
 						linked_lathe.busy = 0
-						SSnanoui.update_uis(src)
+		return TRUE
 
-	else if(href_list["imprint"]) //Causes the Circuit Imprinter to build something.
+	if(action == "imprint") //Causes the Circuit Imprinter to build something.
 		var/coeff = linked_imprinter.efficiency_coeff
 		var/g2g = 1
 		var/enough_materials = 1
@@ -495,7 +506,7 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 				to_chat(usr, "<span class='danger'>Circuit Imprinter is busy at the moment.</span>")
 				return
 			var/datum/design/being_built = null
-			being_built = files.known_designs[href_list["imprint"]]
+			being_built = files.known_designs[params["id"]]
 			if(being_built)
 				var/power = 2000
 				for(var/M in being_built.materials)
@@ -538,53 +549,59 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 							new_item.loc = linked_imprinter.loc
 						linked_imprinter.busy = 0
 						clear_wait_message()
-						SSnanoui.update_uis(src)
+		return TRUE
 
-	else if(href_list["disposeI"] && linked_imprinter)  //Causes the circuit imprinter to dispose of a single reagent (all of it)
-		linked_imprinter.reagents.del_reagent(href_list["disposeI"])
+	if(action == "disposeI" && linked_imprinter)  //Causes the circuit imprinter to dispose of a single reagent (all of it)
+		linked_imprinter.reagents.del_reagent(params["id"])
+		return TRUE
 
-	else if(href_list["disposeallI"] && linked_imprinter) //Causes the circuit imprinter to dispose of all it's reagents.
+	if(action == "disposeallI" && linked_imprinter) //Causes the circuit imprinter to dispose of all it's reagents.
 		linked_imprinter.reagents.clear_reagents()
+		return TRUE
 
-	else if(href_list["disposeP"] && linked_lathe)  //Causes the protolathe to dispose of a single reagent (all of it)
-		linked_lathe.reagents.del_reagent(href_list["disposeP"])
+	if(action == "disposeP" && linked_lathe)  //Causes the protolathe to dispose of a single reagent (all of it)
+		linked_lathe.reagents.del_reagent(params["id"])
+		return TRUE
 
-	else if(href_list["disposeallP"] && linked_lathe) //Causes the protolathe to dispose of all it's reagents.
+	if(action == "disposeallP" && linked_lathe) //Causes the protolathe to dispose of all it's reagents.
 		linked_lathe.reagents.clear_reagents()
+		return TRUE
 
-	else if(href_list["lathe_ejectsheet"] && linked_lathe) //Causes the protolathe to eject a sheet of material
+	if(action == "lathe_ejectsheet" && linked_lathe) //Causes the protolathe to eject a sheet of material
 		var/desired_num_sheets
-		if(href_list["lathe_ejectsheet_amt"] == "custom")
+		if(params["amount"] == "custom")
 			desired_num_sheets = input("How many sheets would you like to eject from the machine?", "How much?", 1) as null|num
 			desired_num_sheets = max(0,desired_num_sheets) // If you input too high of a number, the mineral datum will take care of it either way
 			if(!desired_num_sheets)
-				return
+				return TRUE
 			desired_num_sheets = round(desired_num_sheets) // No partial-sheet goofery
 		else
-			desired_num_sheets = text2num(href_list["lathe_ejectsheet_amt"])
-		linked_lathe.materials.retrieve_sheets(desired_num_sheets, href_list["lathe_ejectsheet"])
+			desired_num_sheets = text2num(params["amount"])
+		linked_lathe.materials.retrieve_sheets(desired_num_sheets, params["id"])
+		return TRUE
 
-	else if(href_list["imprinter_ejectsheet"] && linked_imprinter) //Causes the protolathe to eject a sheet of material
-		var/desired_num_sheets = text2num(href_list["imprinter_ejectsheet_amt"])
-		if(href_list["imprinter_ejectsheet_amt"] == "custom")
+	if(action == "imprinter_ejectsheet" && linked_imprinter) //Causes the protolathe to eject a sheet of material
+		var/desired_num_sheets = text2num(params["amount"])
+		if(params["amount"] == "custom")
 			desired_num_sheets = input("How many sheets would you like to eject from the machine?", "How much?", 1) as null|num
 			desired_num_sheets = max(0,desired_num_sheets) // for the imprinter they have something hacky, that still will guard against shenanigans. eh
 			if(!desired_num_sheets)
 				return
 			desired_num_sheets = round(desired_num_sheets) // No partial-sheet goofery
 		else
-			desired_num_sheets = text2num(href_list["imprinter_ejectsheet_amt"])
-		linked_imprinter.materials.retrieve_sheets(desired_num_sheets, href_list["imprinter_ejectsheet"])
+			desired_num_sheets = text2num(params["amount"])
+		linked_imprinter.materials.retrieve_sheets(desired_num_sheets, params["id"])
+		return TRUE
 
-	else if(href_list["find_device"]) //The R&D console looks for devices nearby to link up with.
+	if(action == "find_device") //The R&D console looks for devices nearby to link up with.
 		add_wait_message("Updating Database...", SYNC_DEVICE_DELAY)
 		spawn(SYNC_DEVICE_DELAY)
 			SyncRDevices()
 			clear_wait_message()
-			SSnanoui.update_uis(src)
+		return TRUE
 
-	else if(href_list["disconnect"]) //The R&D console disconnects with a specific device.
-		switch(href_list["disconnect"])
+	if(action == "disconnect") //The R&D console disconnects with a specific device.
+		switch(params["item"])
 			if("destroy")
 				linked_destroy.linked_console = null
 				linked_destroy = null
@@ -594,8 +611,9 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 			if("imprinter")
 				linked_imprinter.linked_console = null
 				linked_imprinter = null
+		return TRUE
 
-	else if(href_list["reset"]) //Reset the R&D console's database.
+	if(action == "reset") //Reset the R&D console's database.
 		griefProtection()
 		var/choice = alert("Are you sure you want to reset the R&D console's database? Data lost cannot be recovered.", "R&D Console Database Reset", "Continue", "Cancel")
 		if(choice == "Continue")
@@ -604,9 +622,9 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 			files = new /datum/research(src)
 			spawn(RESET_RESEARCH_DELAY)
 				clear_wait_message()
-				SSnanoui.update_uis(src)
+		return TRUE
 
-	else if(href_list["search"]) //Search for designs with name matching pattern
+	if(action == "search") //Search for designs with name matching pattern
 		var/compare
 
 		matching_designs.Cut()
@@ -620,14 +638,14 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 			var/datum/design/D = files.known_designs[v]
 			if(!(D.build_type & compare))
 				continue
-			if(findtext(D.name,href_list["to_search"]))
+			if(findtext(D.name,params["to_search"])) // todo test this line
 				matching_designs.Add(D)
 		submenu = 1
 
-		selected_category = "Search Results for '[href_list["to_search"]]'"
+		selected_category = "Search Results for '[params["to_search"]]'"
+		return TRUE
 
-	SSnanoui.update_uis(src)
-	return
+	return FALSE
 
 
 /obj/machinery/computer/rdconsole/attack_hand(mob/user as mob)
@@ -636,17 +654,17 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 	if(!allowed(user) && !isobserver(user))
 		to_chat(user, "<span class='warning'>Access denied.</span>")
 		return 1
-	ui_interact(user)
+	tgui_interact(user)
 
-/obj/machinery/computer/rdconsole/ui_interact(mob/user, ui_key="main", var/datum/nanoui/ui = null, var/force_open = 1)
+/obj/machinery/computer/rdconsole/tgui_interact(mob/user, ui_key = "main", datum/tgui/ui = null, force_open = TRUE, datum/tgui/master_ui = null, datum/tgui_state/state = GLOB.tgui_default_state)
 	user.set_machine(src)
-	ui = SSnanoui.try_update_ui(user, src, ui_key, ui, force_open)
+	ui = SStgui.try_update_ui(user, src, ui_key, ui, force_open)
 	if(!ui)
-		ui = new(user, src, ui_key, "r_n_d.tmpl", src.name, 800, 550)
+		ui = new(user, src, ui_key, "RndConsole", src.name, 800, 550, master_ui, state)
 		ui.open()
 
-/obj/machinery/computer/rdconsole/ui_data(mob/user, ui_key = "main", datum/topic_state/state = GLOB.default_state)
-	var/data[0]
+/obj/machinery/computer/rdconsole/tgui_data(mob/user, ui_key = "main", datum/topic_state/state = GLOB.default_state)
+	var/list/data = list()
 
 	files.RefreshResearch()
 
@@ -903,7 +921,7 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 		// if the timer calls this function
 		deltimer(wait_message_timer)
 		wait_message_timer = 0
-	SSnanoui.update_uis(src)
+	//SSnanoui.update_uis(src) todo..?
 
 
 /obj/machinery/computer/rdconsole/core
