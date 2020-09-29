@@ -186,7 +186,7 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 		to_chat(user, "<span class='notice'>You add the disk to the machine!</span>")
 	else if(!(linked_destroy && linked_destroy.busy) && !(linked_lathe && linked_lathe.busy) && !(linked_imprinter && linked_imprinter.busy))
 		..()
-	//SSnanoui.update_uis(src) todo..?
+	SStgui.update_uis(src)
 	return
 
 /obj/machinery/computer/rdconsole/emag_act(user as mob)
@@ -208,14 +208,14 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 	usr.set_machine(src)
 	if(action == "nav") //Switches menu screens. Converts a sent text string into a number. Saves a LOT of code.
 		var/next_menu = text2num(params["menu"])
-		var/next_submenu = text2num(params["submenu"]) // todo allow not passing one?
+		var/next_submenu = text2num(params["submenu"])
 		menu = next_menu
 		submenu = next_submenu
 
 		return TRUE
 
 	if(action == "setCategory")
-		var/next_category = params["category"] // todo validate categroy?
+		var/next_category = params["category"]
 		var/compare
 
 		matching_designs.Cut()
@@ -638,7 +638,7 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 			var/datum/design/D = files.known_designs[v]
 			if(!(D.build_type & compare))
 				continue
-			if(findtext(D.name,params["to_search"])) // todo test this line
+			if(findtext(D.name,params["to_search"]))
 				matching_designs.Add(D)
 		submenu = 1
 
@@ -782,7 +782,7 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 				var/list/materials_list = list()
 				design_list["materials"] = materials_list
 				design_list["id"] = D.id
-				design_list["name"] = sanitize(D.name)
+				design_list["name"] = D.name
 				var/c = 50
 				for(var/M in D.materials)
 					var/list/material_list = list()
@@ -851,7 +851,7 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 				var/list/materials_list = list()
 				design_list["materials"] = materials_list
 				design_list["id"] = D.id
-				design_list["name"] = sanitize(D.name)
+				design_list["name"] = D.name
 				var/check_materials = 1
 				for(var/M in D.materials)
 					var/list/material_list = list()
@@ -921,7 +921,7 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 		// if the timer calls this function
 		deltimer(wait_message_timer)
 		wait_message_timer = 0
-	//SSnanoui.update_uis(src) todo..?
+	SStgui.update_uis(src)
 
 
 /obj/machinery/computer/rdconsole/core
