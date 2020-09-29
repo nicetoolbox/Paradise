@@ -206,446 +206,435 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 	add_fingerprint(usr)
 
 	usr.set_machine(src)
-	if(action == "nav") //Switches menu screens. Converts a sent text string into a number. Saves a LOT of code.
-		var/next_menu = text2num(params["menu"])
-		var/next_submenu = text2num(params["submenu"])
-		menu = next_menu
-		submenu = next_submenu
 
-		return TRUE
+	switch(action)
+		if("nav") //Switches menu screens. Converts a sent text string into a number. Saves a LOT of code.
+			var/next_menu = text2num(params["menu"])
+			var/next_submenu = text2num(params["submenu"])
+			menu = next_menu
+			submenu = next_submenu
 
-	if(action == "setCategory")
-		var/next_category = params["category"]
-		var/compare
+		if("setCategory")
+			var/next_category = params["category"]
+			var/compare
 
-		matching_designs.Cut()
+			matching_designs.Cut()
 
-		if(menu == 4)
-			compare = PROTOLATHE
-		else
-			compare = IMPRINTER
+			if(menu == 4)
+				compare = PROTOLATHE
+			else
+				compare = IMPRINTER
 
-		for(var/v in files.known_designs)
-			var/datum/design/D = files.known_designs[v]
-			if(!(D.build_type & compare))
-				continue
-			if(next_category in D.category)
-				matching_designs.Add(D)
-		submenu = 1
+			for(var/v in files.known_designs)
+				var/datum/design/D = files.known_designs[v]
+				if(!(D.build_type & compare))
+					continue
+				if(next_category in D.category)
+					matching_designs.Add(D)
+			submenu = 1
 
-		selected_category = "Viewing Category [next_category]"
+			selected_category = "Viewing Category [next_category]"
 
-		return TRUE
+		if("updt_tech") //Update the research holder with information from the technology disk.
+			add_wait_message("Updating Database...", TECH_UPDATE_DELAY)
+			spawn(TECH_UPDATE_DELAY)
+				clear_wait_message()
+				files.AddTech2Known(t_disk.stored)
+				SStgui.update_uis(src)
+				griefProtection() //Update centcom too
 
-	if(action == "updt_tech") //Update the research holder with information from the technology disk.
-		add_wait_message("Updating Database...", TECH_UPDATE_DELAY)
-		spawn(TECH_UPDATE_DELAY)
-			clear_wait_message()
-			files.AddTech2Known(t_disk.stored)
-			griefProtection() //Update centcom too
-		return TRUE
+		if("clear_tech") //Erase data on the technology disk.
+			if(t_disk)
+				t_disk.wipe_tech()
 
-	if(action == "clear_tech") //Erase data on the technology disk.
-		if(t_disk)
-			t_disk.wipe_tech()
-		return TRUE
+		if("eject_tech") //Eject the technology disk.
+			if(t_disk)
+				t_disk.loc = src.loc
+				t_disk = null
+			menu = 0
+			submenu = 0
 
-	if(action == "eject_tech") //Eject the technology disk.
-		if(t_disk)
-			t_disk.loc = src.loc
-			t_disk = null
-		menu = 0
-		submenu = 0
-		return TRUE
+		if("copy_tech") //Copy some technology data from the research holder to the disk.
+			// Somehow this href makes me very nervous
+			t_disk.stored = files.known_tech[params["id"]]
+			menu = 2
+			submenu = 0
 
-	if(action == "copy_tech") //Copy some technology data from the research holder to the disk.
-		// Somehow this href makes me very nervous
-		t_disk.stored = files.known_tech[params["id"]]
-		menu = 2
-		submenu = 0
-		return TRUE
+		if("updt_design") //Updates the research holder with design data from the design disk.
+			add_wait_message("Updating Database...", DESIGN_UPDATE_DELAY)
+			spawn(DESIGN_UPDATE_DELAY)
+				clear_wait_message()
+				files.AddDesign2Known(d_disk.blueprint)
+				SStgui.update_uis(src)
+				griefProtection() //Update centcom too
 
-	if(action == "updt_design") //Updates the research holder with design data from the design disk.
-		add_wait_message("Updating Database...", DESIGN_UPDATE_DELAY)
-		spawn(DESIGN_UPDATE_DELAY)
-			clear_wait_message()
-			files.AddDesign2Known(d_disk.blueprint)
-			griefProtection() //Update centcom too
-		return TRUE
+		if("clear_design") //Erases data on the design disk.
+			if(d_disk)
+				d_disk.wipe_blueprint()
 
-	if(action == "clear_design") //Erases data on the design disk.
-		if(d_disk)
-			d_disk.wipe_blueprint()
-		return TRUE
+		if("eject_design") //Eject the design disk.
+			if(d_disk)
+				d_disk.loc = src.loc
+				d_disk = null
+			menu = 0
+			submenu = 0
 
-	if(action == "eject_design") //Eject the design disk.
-		if(d_disk)
-			d_disk.loc = src.loc
-			d_disk = null
-		menu = 0
-		submenu = 0
-		return TRUE
-
-	if(action == "copy_design") //Copy design data from the research holder to the design disk.
-		// This href ALSO makes me very nervous
-		var/datum/design/D = files.known_designs[params["id"]]
-		if(D)
-			// eeeeeep design datums are global be careful!
-			var/autolathe_friendly = 1
-			for(var/x in D.materials)
-				if( !(x in list(MAT_METAL, MAT_GLASS)))
+		if("copy_design") //Copy design data from the research holder to the design disk.
+			// This href ALSO makes me very nervous
+			var/datum/design/D = files.known_designs[params["id"]]
+			if(D)
+				// eeeeeep design datums are global be careful!
+				var/autolathe_friendly = 1
+				for(var/x in D.materials)
+					if( !(x in list(MAT_METAL, MAT_GLASS)))
+						autolathe_friendly = 0
+						D.category -= "Imported"
+				if(D.locked)
 					autolathe_friendly = 0
 					D.category -= "Imported"
-			if(D.locked)
-				autolathe_friendly = 0
-				D.category -= "Imported"
-			if(D.build_type & (AUTOLATHE|PROTOLATHE|CRAFTLATHE)) // Specifically excludes circuit imprinter and mechfab
-				D.build_type = autolathe_friendly ? (D.build_type | AUTOLATHE) : D.build_type
-				D.category |= "Imported"
-			d_disk.blueprint = D
-		menu = 2
-		submenu = 0
-		return TRUE
+				if(D.build_type & (AUTOLATHE|PROTOLATHE|CRAFTLATHE)) // Specifically excludes circuit imprinter and mechfab
+					D.build_type = autolathe_friendly ? (D.build_type | AUTOLATHE) : D.build_type
+					D.category |= "Imported"
+				d_disk.blueprint = D
+			menu = 2
+			submenu = 0
 
-	if(action == "eject_item") //Eject the item inside the destructive analyzer.
-		if(linked_destroy)
-			if(linked_destroy.busy)
-				to_chat(usr, "<span class='danger'> The destructive analyzer is busy at the moment.</span>")
+		if("eject_item") //Eject the item inside the destructive analyzer.
+			if(linked_destroy)
+				if(linked_destroy.busy)
+					to_chat(usr, "<span class='danger'> The destructive analyzer is busy at the moment.</span>")
 
-			else if(linked_destroy.loaded_item)
-				linked_destroy.loaded_item.loc = linked_destroy.loc
-				linked_destroy.loaded_item = null
-				linked_destroy.icon_state = "d_analyzer"
-				menu = 3
-		return TRUE
+				else if(linked_destroy.loaded_item)
+					linked_destroy.loaded_item.loc = linked_destroy.loc
+					linked_destroy.loaded_item = null
+					linked_destroy.icon_state = "d_analyzer"
+					menu = 3
 
-	if(action == "maxresearch") //Eject the item inside the destructive analyzer.
-		if(!check_rights(R_ADMIN))
-			return
-		if(alert("Are you sure you want to maximize research levels?","Confirmation","Yes","No")=="No")
-			return
-		log_admin("[key_name(usr)] has maximized the research levels.")
-		message_admins("[key_name_admin(usr)] has maximized the research levels.")
-		Maximize()
-		griefProtection() //Update centcomm too
-		return TRUE
-
-	if(action == "deconstruct") //Deconstruct the item in the destructive analyzer and update the research holder.
-		if(linked_destroy)
-			if(linked_destroy.busy)
-				to_chat(usr, "<span class='danger'>The destructive analyzer is busy at the moment.</span>")
+		if("maxresearch") //Eject the item inside the destructive analyzer.
+			if(!check_rights(R_ADMIN))
 				return
-			var/list/temp_tech = linked_destroy.ConvertReqString2List(linked_destroy.loaded_item.origin_tech)
-			var/cancontinue = FALSE
-			for(var/T in temp_tech)
-				if(files.IsTechHigher(T, temp_tech[T]))
-					cancontinue = TRUE
-					break
-			if(!cancontinue)
-				var/choice = input("This item does not raise tech levels. Proceed destroying loaded item anyway?") in list("Proceed", "Cancel")
-				if(choice == "Cancel" || !linked_destroy)
+			if(alert("Are you sure you want to maximize research levels?","Confirmation","Yes","No")=="No")
+				return
+			log_admin("[key_name(usr)] has maximized the research levels.")
+			message_admins("[key_name_admin(usr)] has maximized the research levels.")
+			Maximize()
+			SStgui.update_uis(src)
+			griefProtection() //Update centcomm too
+
+		if("deconstruct") //Deconstruct the item in the destructive analyzer and update the research holder.
+			if(linked_destroy)
+				if(linked_destroy.busy)
+					to_chat(usr, "<span class='danger'>The destructive analyzer is busy at the moment.</span>")
 					return
-			linked_destroy.busy = 1
-			add_wait_message("Processing and Updating Database...", DECONSTRUCT_DELAY)
-			flick("d_analyzer_process", linked_destroy)
-			spawn(DECONSTRUCT_DELAY)
-				clear_wait_message()
-				if(linked_destroy)
-					linked_destroy.busy = 0
-					if(!linked_destroy.hacked)
-						if(!linked_destroy.loaded_item)
-							to_chat(usr, "<span class='danger'>The destructive analyzer appears to be empty.</span>")
-							menu = 0
-							submenu = 0
-							return
-						for(var/T in temp_tech)
-							var/datum/tech/KT = files.known_tech[T] //For stat logging of high levels
-							if(files.IsTechHigher(T, temp_tech[T]) && KT.level >= 5) //For stat logging of high levels
-								feedback_add_details("high_research_level","[KT][KT.level + 1]") //+1 to show the level which we're about to get
-							files.UpdateTech(T, temp_tech[T])
-							menu = 0
-							submenu = 0
-						if(linked_lathe) //Also sends salvaged materials to a linked protolathe, if any.
-							for(var/material in linked_destroy.loaded_item.materials)
-								var/can_insert = min(linked_lathe.materials.max_amount - linked_lathe.materials.total_amount, linked_destroy.loaded_item.materials[material] * (linked_destroy.decon_mod / 10), linked_destroy.loaded_item.materials[material])
-								linked_lathe.materials.insert_amount(can_insert, material)
-						linked_destroy.loaded_item = null
-					else
-						menu = 0
-						submenu = 0
-					for(var/obj/I in linked_destroy.contents)
-						for(var/mob/M in I.contents)
-							M.death()
-						if(istype(I,/obj/item/stack/sheet))//Only deconsturcts one sheet at a time instead of the entire stack
-							var/obj/item/stack/sheet/S = I
-							if(S.amount > 1)
-								S.amount--
-								linked_destroy.loaded_item = S
-							else
-								qdel(S)
-								linked_destroy.icon_state = "d_analyzer"
+				var/list/temp_tech = linked_destroy.ConvertReqString2List(linked_destroy.loaded_item.origin_tech)
+				var/cancontinue = FALSE
+				for(var/T in temp_tech)
+					if(files.IsTechHigher(T, temp_tech[T]))
+						cancontinue = TRUE
+						break
+				if(!cancontinue)
+					var/choice = input("This item does not raise tech levels. Proceed destroying loaded item anyway?") in list("Proceed", "Cancel")
+					if(choice == "Cancel" || !linked_destroy)
+						return
+				linked_destroy.busy = 1
+				add_wait_message("Processing and Updating Database...", DECONSTRUCT_DELAY)
+				SStgui.update_uis(src)
+				flick("d_analyzer_process", linked_destroy)
+				spawn(DECONSTRUCT_DELAY)
+					clear_wait_message()
+					if(linked_destroy)
+						linked_destroy.busy = 0
+						if(!linked_destroy.hacked)
+							if(!linked_destroy.loaded_item)
+								to_chat(usr, "<span class='danger'>The destructive analyzer appears to be empty.</span>")
+								menu = 0
+								submenu = 0
+								return
+							for(var/T in temp_tech)
+								var/datum/tech/KT = files.known_tech[T] //For stat logging of high levels
+								if(files.IsTechHigher(T, temp_tech[T]) && KT.level >= 5) //For stat logging of high levels
+									feedback_add_details("high_research_level","[KT][KT.level + 1]") //+1 to show the level which we're about to get
+								files.UpdateTech(T, temp_tech[T])
+								menu = 0
+								submenu = 0
+							if(linked_lathe) //Also sends salvaged materials to a linked protolathe, if any.
+								for(var/material in linked_destroy.loaded_item.materials)
+									var/can_insert = min(linked_lathe.materials.max_amount - linked_lathe.materials.total_amount, linked_destroy.loaded_item.materials[material] * (linked_destroy.decon_mod / 10), linked_destroy.loaded_item.materials[material])
+									linked_lathe.materials.insert_amount(can_insert, material)
+							linked_destroy.loaded_item = null
 						else
-							if(!(I in linked_destroy.component_parts))
-								qdel(I)
-								linked_destroy.icon_state = "d_analyzer"
-					use_power(250)
-		return TRUE
-
-	if(action == "sync") //Sync the research holder with all the R&D consoles in the game that aren't sync protected.
-		if(!sync)
-			to_chat(usr, "<span class='danger'>You must connect to the network first!</span>")
-		else
-			add_wait_message("Updating Database...", SYNC_RESEARCH_DELAY)
-			griefProtection() //Putting this here because I dont trust the sync process
-			spawn(SYNC_RESEARCH_DELAY)
-				clear_wait_message()
-				if(src)
-					for(var/obj/machinery/r_n_d/server/S in GLOB.machines)
-						var/server_processed = 0
-						if(S.disabled)
-							continue
-						if((id in S.id_with_upload) || istype(S, /obj/machinery/r_n_d/server/centcom))
-							files.push_data(S.files)
-							server_processed = 1
-						if(((id in S.id_with_download) && !istype(S, /obj/machinery/r_n_d/server/centcom)) || S.hacked)
-							S.files.push_data(files)
-							server_processed = 1
-						if(!istype(S, /obj/machinery/r_n_d/server/centcom) && server_processed)
-							S.produce_heat(100)
-		return TRUE
-
-	if(action == "togglesync") //Prevents the console from being synced by other consoles. Can still send data.
-		sync = !sync
-		return TRUE
-
-	if(action == "build") //Causes the Protolathe to build something.
-		if(linked_lathe)
-			if(linked_lathe.busy)
-				to_chat(usr, "<span class='danger'>Protolathe is busy at the moment.</span>")
-				return TRUE
-			var/coeff = linked_lathe.efficiency_coeff
-			var/g2g = 1
-			var/datum/design/being_built = files.known_designs[params["id"]]
-			if(being_built)
-				var/power = 2000
-				var/amount=text2num(params["amount"])
-				if(being_built.make_reagents.len)
-					return 0
-				amount = max(1, min(10, amount))
-				for(var/M in being_built.materials)
-					power += round(being_built.materials[M] * amount / 5)
-				power = max(2000, power)
-				var/key = usr.key	//so we don't lose the info during the spawn delay
-				if(!(being_built.build_type & PROTOLATHE))
-					g2g = 0
-					message_admins("Protolathe exploit attempted by [key_name(usr, TRUE)]!")
-
-				if(g2g) //If input is incorrect, nothing happens
-					var/new_coeff = coeff * being_built.lathe_time_factor
-					var/time_to_construct = PROTOLATHE_CONSTRUCT_DELAY * new_coeff * amount ** 0.8
-					var/enough_materials = 1
-
-					add_wait_message("Constructing Prototype. Please Wait...", time_to_construct)
-					linked_lathe.busy = 1
-					flick("protolathe_n",linked_lathe)
-					use_power(power)
-
-					var/list/efficient_mats = list()
-					for(var/MAT in being_built.materials)
-						efficient_mats[MAT] = being_built.materials[MAT]*coeff
-
-					if(!linked_lathe.materials.has_materials(efficient_mats, amount))
-						src.visible_message("<span class='notice'>The [src.name] beeps, \"Not enough materials to complete prototype.\"</span>")
-						enough_materials = 0
-						g2g = 0
-					else
-						for(var/R in being_built.reagents_list)
-							if(!linked_lathe.reagents.has_reagent(R, being_built.reagents_list[R])*coeff)
-								src.visible_message("<span class='notice'>The [src.name] beeps, \"Not enough reagents to complete prototype.\"</span>")
-								enough_materials = 0
-								g2g = 0
-
-					if(enough_materials)
-						linked_lathe.materials.use_amount(efficient_mats, amount)
-						for(var/R in being_built.reagents_list)
-							linked_lathe.reagents.remove_reagent(R, being_built.reagents_list[R]*coeff)
-
-					var/P = being_built.build_path //lets save these values before the spawn() just in case. Nobody likes runtimes.
-					var/O = being_built.locked
-
-					spawn(time_to_construct)
-						if(g2g) //And if we only fail the material requirements, we still spend time and power
-							for(var/i = 0, i<amount, i++)
-								var/obj/item/new_item = new P(src)
-								if( new_item.type == /obj/item/storage/backpack/holding )
-									new_item.investigate_log("built by [key]","singulo")
-								if(!istype(new_item, /obj/item/stack/sheet)) // To avoid materials dupe glitches
-									new_item.materials = efficient_mats.Copy()
-								if(O)
-									var/obj/item/storage/lockbox/research/L = new/obj/item/storage/lockbox/research(linked_lathe.loc)
-									new_item.forceMove(L)
-									L.name += " ([new_item.name])"
-									L.origin_tech = new_item.origin_tech
-									L.req_access = being_built.access_requirement
-									var/list/lockbox_access
-									for(var/A in L.req_access)
-										lockbox_access += "[get_access_desc(A)] "
-									L.desc = "A locked box. It is locked to [lockbox_access]access."
+							menu = 0
+							submenu = 0
+						for(var/obj/I in linked_destroy.contents)
+							for(var/mob/M in I.contents)
+								M.death()
+							if(istype(I,/obj/item/stack/sheet))//Only deconsturcts one sheet at a time instead of the entire stack
+								var/obj/item/stack/sheet/S = I
+								if(S.amount > 1)
+									S.amount--
+									linked_destroy.loaded_item = S
 								else
-									new_item.loc = linked_lathe.loc
-						clear_wait_message()
-						linked_lathe.busy = 0
-		return TRUE
+									qdel(S)
+									linked_destroy.icon_state = "d_analyzer"
+							else
+								if(!(I in linked_destroy.component_parts))
+									qdel(I)
+									linked_destroy.icon_state = "d_analyzer"
+						use_power(250)
+						SStgui.update_uis(src)
 
-	if(action == "imprint") //Causes the Circuit Imprinter to build something.
-		var/coeff = linked_imprinter.efficiency_coeff
-		var/g2g = 1
-		var/enough_materials = 1
-		if(linked_imprinter)
-			if(linked_imprinter.busy)
-				to_chat(usr, "<span class='danger'>Circuit Imprinter is busy at the moment.</span>")
-				return
-			var/datum/design/being_built = null
-			being_built = files.known_designs[params["id"]]
-			if(being_built)
-				var/power = 2000
-				for(var/M in being_built.materials)
-					power += round(being_built.materials[M] / 5)
-				power = max(2000, power)
-				if(!(being_built.build_type & IMPRINTER))
-					g2g = 0
-					message_admins("Circuit imprinter exploit attempted by [key_name(usr, TRUE)]!")
+		if("sync") //Sync the research holder with all the R&D consoles in the game that aren't sync protected.
+			if(!sync)
+				to_chat(usr, "<span class='danger'>You must connect to the network first!</span>")
+			else
+				add_wait_message("Updating Database...", SYNC_RESEARCH_DELAY)
+				griefProtection() //Putting this here because I dont trust the sync process
+				spawn(SYNC_RESEARCH_DELAY)
+					clear_wait_message()
+					if(src)
+						for(var/obj/machinery/r_n_d/server/S in GLOB.machines)
+							var/server_processed = 0
+							if(S.disabled)
+								continue
+							if((id in S.id_with_upload) || istype(S, /obj/machinery/r_n_d/server/centcom))
+								files.push_data(S.files)
+								server_processed = 1
+							if(((id in S.id_with_download) && !istype(S, /obj/machinery/r_n_d/server/centcom)) || S.hacked)
+								S.files.push_data(files)
+								server_processed = 1
+							if(!istype(S, /obj/machinery/r_n_d/server/centcom) && server_processed)
+								S.produce_heat(100)
+						SStgui.update_uis(src)
 
-				if(g2g) //Again, if input is wrong, do nothing
-					add_wait_message("Imprinting Circuit. Please Wait...", IMPRINTER_DELAY)
-					linked_imprinter.busy = 1
-					flick("circuit_imprinter_ani",linked_imprinter)
-					use_power(power)
+		if("togglesync") //Prevents the console from being synced by other consoles. Can still send data.
+			sync = !sync
 
-					var/list/efficient_mats = list()
-					for(var/MAT in being_built.materials)
-						efficient_mats[MAT] = being_built.materials[MAT]/coeff
-
-					if(!linked_imprinter.materials.has_materials(efficient_mats))
-						visible_message("<span class='notice'>The [src.name] beeps, \"Not enough materials to complete prototype.\"</span>")
-						enough_materials = 0
+		if("build") //Causes the Protolathe to build something.
+			if(linked_lathe)
+				if(linked_lathe.busy)
+					to_chat(usr, "<span class='danger'>Protolathe is busy at the moment.</span>")
+					return TRUE
+				var/coeff = linked_lathe.efficiency_coeff
+				var/g2g = 1
+				var/datum/design/being_built = files.known_designs[params["id"]]
+				if(being_built)
+					var/power = 2000
+					var/amount=text2num(params["amount"])
+					if(being_built.make_reagents.len)
+						return 0
+					amount = max(1, min(10, amount))
+					for(var/M in being_built.materials)
+						power += round(being_built.materials[M] * amount / 5)
+					power = max(2000, power)
+					var/key = usr.key	//so we don't lose the info during the spawn delay
+					if(!(being_built.build_type & PROTOLATHE))
 						g2g = 0
-					else
-						for(var/R in being_built.reagents_list)
-							if(!linked_imprinter.reagents.has_reagent(R, being_built.reagents_list[R]/coeff))
-								visible_message("<span class='notice'>The [name] beeps, \"Not enough reagents to complete prototype.\"</span>")
-								enough_materials = 0
-								g2g = 0
+						message_admins("Protolathe exploit attempted by [key_name(usr, TRUE)]!")
 
-					if(enough_materials)
-						linked_imprinter.materials.use_amount(efficient_mats)
-						for(var/R in being_built.reagents_list)
-							linked_imprinter.reagents.remove_reagent(R, being_built.reagents_list[R]/coeff)
+					if(g2g) //If input is incorrect, nothing happens
+						var/new_coeff = coeff * being_built.lathe_time_factor
+						var/time_to_construct = PROTOLATHE_CONSTRUCT_DELAY * new_coeff * amount ** 0.8
+						var/enough_materials = 1
 
-					var/P = being_built.build_path //lets save these values before the spawn() just in case. Nobody likes runtimes.
-					spawn(IMPRINTER_DELAY)
-						if(g2g)
-							var/obj/item/new_item = new P(src)
-							new_item.loc = linked_imprinter.loc
-						linked_imprinter.busy = 0
-						clear_wait_message()
-		return TRUE
+						add_wait_message("Constructing Prototype. Please Wait...", time_to_construct)
+						linked_lathe.busy = 1
+						flick("protolathe_n",linked_lathe)
+						use_power(power)
 
-	if(action == "disposeI" && linked_imprinter)  //Causes the circuit imprinter to dispose of a single reagent (all of it)
-		linked_imprinter.reagents.del_reagent(params["id"])
-		return TRUE
+						var/list/efficient_mats = list()
+						for(var/MAT in being_built.materials)
+							efficient_mats[MAT] = being_built.materials[MAT]*coeff
 
-	if(action == "disposeallI" && linked_imprinter) //Causes the circuit imprinter to dispose of all it's reagents.
-		linked_imprinter.reagents.clear_reagents()
-		return TRUE
+						if(!linked_lathe.materials.has_materials(efficient_mats, amount))
+							src.visible_message("<span class='notice'>The [src.name] beeps, \"Not enough materials to complete prototype.\"</span>")
+							enough_materials = 0
+							g2g = 0
+						else
+							for(var/R in being_built.reagents_list)
+								if(!linked_lathe.reagents.has_reagent(R, being_built.reagents_list[R])*coeff)
+									src.visible_message("<span class='notice'>The [src.name] beeps, \"Not enough reagents to complete prototype.\"</span>")
+									enough_materials = 0
+									g2g = 0
 
-	if(action == "disposeP" && linked_lathe)  //Causes the protolathe to dispose of a single reagent (all of it)
-		linked_lathe.reagents.del_reagent(params["id"])
-		return TRUE
+						if(enough_materials)
+							linked_lathe.materials.use_amount(efficient_mats, amount)
+							for(var/R in being_built.reagents_list)
+								linked_lathe.reagents.remove_reagent(R, being_built.reagents_list[R]*coeff)
 
-	if(action == "disposeallP" && linked_lathe) //Causes the protolathe to dispose of all it's reagents.
-		linked_lathe.reagents.clear_reagents()
-		return TRUE
+						var/P = being_built.build_path //lets save these values before the spawn() just in case. Nobody likes runtimes.
+						var/O = being_built.locked
 
-	if(action == "lathe_ejectsheet" && linked_lathe) //Causes the protolathe to eject a sheet of material
-		var/desired_num_sheets
-		if(params["amount"] == "custom")
-			desired_num_sheets = input("How many sheets would you like to eject from the machine?", "How much?", 1) as null|num
-			desired_num_sheets = max(0,desired_num_sheets) // If you input too high of a number, the mineral datum will take care of it either way
-			if(!desired_num_sheets)
-				return TRUE
-			desired_num_sheets = round(desired_num_sheets) // No partial-sheet goofery
-		else
-			desired_num_sheets = text2num(params["amount"])
-		linked_lathe.materials.retrieve_sheets(desired_num_sheets, params["id"])
-		return TRUE
+						spawn(time_to_construct)
+							if(g2g) //And if we only fail the material requirements, we still spend time and power
+								for(var/i = 0, i<amount, i++)
+									var/obj/item/new_item = new P(src)
+									if( new_item.type == /obj/item/storage/backpack/holding )
+										new_item.investigate_log("built by [key]","singulo")
+									if(!istype(new_item, /obj/item/stack/sheet)) // To avoid materials dupe glitches
+										new_item.materials = efficient_mats.Copy()
+									if(O)
+										var/obj/item/storage/lockbox/research/L = new/obj/item/storage/lockbox/research(linked_lathe.loc)
+										new_item.forceMove(L)
+										L.name += " ([new_item.name])"
+										L.origin_tech = new_item.origin_tech
+										L.req_access = being_built.access_requirement
+										var/list/lockbox_access
+										for(var/A in L.req_access)
+											lockbox_access += "[get_access_desc(A)] "
+										L.desc = "A locked box. It is locked to [lockbox_access]access."
+									else
+										new_item.loc = linked_lathe.loc
+							clear_wait_message()
+							linked_lathe.busy = 0
+							SStgui.update_uis(src)
 
-	if(action == "imprinter_ejectsheet" && linked_imprinter) //Causes the protolathe to eject a sheet of material
-		var/desired_num_sheets = text2num(params["amount"])
-		if(params["amount"] == "custom")
-			desired_num_sheets = input("How many sheets would you like to eject from the machine?", "How much?", 1) as null|num
-			desired_num_sheets = max(0,desired_num_sheets) // for the imprinter they have something hacky, that still will guard against shenanigans. eh
-			if(!desired_num_sheets)
-				return
-			desired_num_sheets = round(desired_num_sheets) // No partial-sheet goofery
-		else
-			desired_num_sheets = text2num(params["amount"])
-		linked_imprinter.materials.retrieve_sheets(desired_num_sheets, params["id"])
-		return TRUE
+		if("imprint") //Causes the Circuit Imprinter to build something.
+			var/coeff = linked_imprinter.efficiency_coeff
+			var/g2g = 1
+			var/enough_materials = 1
+			if(linked_imprinter)
+				if(linked_imprinter.busy)
+					to_chat(usr, "<span class='danger'>Circuit Imprinter is busy at the moment.</span>")
+					return
+				var/datum/design/being_built = null
+				being_built = files.known_designs[params["id"]]
+				if(being_built)
+					var/power = 2000
+					for(var/M in being_built.materials)
+						power += round(being_built.materials[M] / 5)
+					power = max(2000, power)
+					if(!(being_built.build_type & IMPRINTER))
+						g2g = 0
+						message_admins("Circuit imprinter exploit attempted by [key_name(usr, TRUE)]!")
 
-	if(action == "find_device") //The R&D console looks for devices nearby to link up with.
-		add_wait_message("Updating Database...", SYNC_DEVICE_DELAY)
-		spawn(SYNC_DEVICE_DELAY)
-			SyncRDevices()
-			clear_wait_message()
-		return TRUE
+					if(g2g) //Again, if input is wrong, do nothing
+						add_wait_message("Imprinting Circuit. Please Wait...", IMPRINTER_DELAY)
+						linked_imprinter.busy = 1
+						flick("circuit_imprinter_ani",linked_imprinter)
+						use_power(power)
 
-	if(action == "disconnect") //The R&D console disconnects with a specific device.
-		switch(params["item"])
-			if("destroy")
-				linked_destroy.linked_console = null
-				linked_destroy = null
-			if("lathe")
-				linked_lathe.linked_console = null
-				linked_lathe = null
-			if("imprinter")
-				linked_imprinter.linked_console = null
-				linked_imprinter = null
-		return TRUE
+						var/list/efficient_mats = list()
+						for(var/MAT in being_built.materials)
+							efficient_mats[MAT] = being_built.materials[MAT]/coeff
 
-	if(action == "reset") //Reset the R&D console's database.
-		griefProtection()
-		var/choice = alert("Are you sure you want to reset the R&D console's database? Data lost cannot be recovered.", "R&D Console Database Reset", "Continue", "Cancel")
-		if(choice == "Continue")
-			add_wait_message("Updating Database...", RESET_RESEARCH_DELAY)
-			qdel(files)
-			files = new /datum/research(src)
-			spawn(RESET_RESEARCH_DELAY)
+						if(!linked_imprinter.materials.has_materials(efficient_mats))
+							visible_message("<span class='notice'>The [src.name] beeps, \"Not enough materials to complete prototype.\"</span>")
+							enough_materials = 0
+							g2g = 0
+						else
+							for(var/R in being_built.reagents_list)
+								if(!linked_imprinter.reagents.has_reagent(R, being_built.reagents_list[R]/coeff))
+									visible_message("<span class='notice'>The [name] beeps, \"Not enough reagents to complete prototype.\"</span>")
+									enough_materials = 0
+									g2g = 0
+
+						if(enough_materials)
+							linked_imprinter.materials.use_amount(efficient_mats)
+							for(var/R in being_built.reagents_list)
+								linked_imprinter.reagents.remove_reagent(R, being_built.reagents_list[R]/coeff)
+
+						var/P = being_built.build_path //lets save these values before the spawn() just in case. Nobody likes runtimes.
+						spawn(IMPRINTER_DELAY)
+							if(g2g)
+								var/obj/item/new_item = new P(src)
+								new_item.loc = linked_imprinter.loc
+							linked_imprinter.busy = 0
+							clear_wait_message()
+							SStgui.update_uis(src)
+
+		if("disposeI")  //Causes the circuit imprinter to dispose of a single reagent (all of it)
+			if(linked_imprinter)
+				linked_imprinter.reagents.del_reagent(params["id"])
+
+		if("disposeallI") //Causes the circuit imprinter to dispose of all it's reagents.
+			if(linked_imprinter)
+				linked_imprinter.reagents.clear_reagents()
+
+		if("disposeP")  //Causes the protolathe to dispose of a single reagent (all of it)
+			if(linked_lathe)
+				linked_lathe.reagents.del_reagent(params["id"])
+
+		if("disposeallP") //Causes the protolathe to dispose of all it's reagents.
+			if(linked_lathe)
+				linked_lathe.reagents.clear_reagents()
+
+		if("lathe_ejectsheet") //Causes the protolathe to eject a sheet of material
+			if(linked_lathe)
+				var/desired_num_sheets
+				if(params["amount"] == "custom")
+					desired_num_sheets = input("How many sheets would you like to eject from the machine?", "How much?", 1) as null|num
+					desired_num_sheets = max(0,desired_num_sheets) // If you input too high of a number, the mineral datum will take care of it either way
+					if(!desired_num_sheets)
+						return TRUE
+					desired_num_sheets = round(desired_num_sheets) // No partial-sheet goofery
+				else
+					desired_num_sheets = text2num(params["amount"])
+				linked_lathe.materials.retrieve_sheets(desired_num_sheets, params["id"])
+
+		if("imprinter_ejectsheet") //Causes the protolathe to eject a sheet of material
+			if(linked_imprinter)
+				var/desired_num_sheets = text2num(params["amount"])
+				if(params["amount"] == "custom")
+					desired_num_sheets = input("How many sheets would you like to eject from the machine?", "How much?", 1) as null|num
+					desired_num_sheets = max(0,desired_num_sheets) // for the imprinter they have something hacky, that still will guard against shenanigans. eh
+					if(!desired_num_sheets)
+						return
+					desired_num_sheets = round(desired_num_sheets) // No partial-sheet goofery
+				else
+					desired_num_sheets = text2num(params["amount"])
+				linked_imprinter.materials.retrieve_sheets(desired_num_sheets, params["id"])
+
+		if("find_device") //The R&D console looks for devices nearby to link up with.
+			add_wait_message("Updating Database...", SYNC_DEVICE_DELAY)
+			spawn(SYNC_DEVICE_DELAY)
+				SyncRDevices()
 				clear_wait_message()
-		return TRUE
+				SStgui.update_uis(src)
 
-	if(action == "search") //Search for designs with name matching pattern
-		var/compare
+		if("disconnect") //The R&D console disconnects with a specific device.
+			switch(params["item"])
+				if("destroy")
+					linked_destroy.linked_console = null
+					linked_destroy = null
+				if("lathe")
+					linked_lathe.linked_console = null
+					linked_lathe = null
+				if("imprinter")
+					linked_imprinter.linked_console = null
+					linked_imprinter = null
 
-		matching_designs.Cut()
+		if("reset") //Reset the R&D console's database.
+			griefProtection()
+			var/choice = alert("Are you sure you want to reset the R&D console's database? Data lost cannot be recovered.", "R&D Console Database Reset", "Continue", "Cancel")
+			if(choice == "Continue")
+				add_wait_message("Updating Database...", RESET_RESEARCH_DELAY)
+				qdel(files)
+				files = new /datum/research(src)
+				spawn(RESET_RESEARCH_DELAY)
+					clear_wait_message()
+					SStgui.update_uis(src)
 
-		if(menu == 4)
-			compare = PROTOLATHE
-		else
-			compare = IMPRINTER
+		if("search") //Search for designs with name matching pattern
+			var/compare
 
-		for(var/v in files.known_designs)
-			var/datum/design/D = files.known_designs[v]
-			if(!(D.build_type & compare))
-				continue
-			if(findtext(D.name,params["to_search"]))
-				matching_designs.Add(D)
-		submenu = 1
+			matching_designs.Cut()
 
-		selected_category = "Search Results for '[params["to_search"]]'"
-		return TRUE
+			if(menu == 4)
+				compare = PROTOLATHE
+			else
+				compare = IMPRINTER
 
-	return FALSE
+			for(var/v in files.known_designs)
+				var/datum/design/D = files.known_designs[v]
+				if(!(D.build_type & compare))
+					continue
+				if(findtext(D.name,params["to_search"]))
+					matching_designs.Add(D)
+			submenu = 1
+
+			selected_category = "Search Results for '[params["to_search"]]'"
+
+	return TRUE // update uis
 
 
 /obj/machinery/computer/rdconsole/attack_hand(mob/user as mob)
