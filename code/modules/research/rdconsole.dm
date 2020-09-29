@@ -677,7 +677,7 @@ won't update every console in existence) but it's more of a hassle to do. Also, 
 	data["linked_lathe"] = linked_lathe ? 1 : 0
 	data["linked_imprinter"] = linked_imprinter ? 1 : 0
 	data["sync"] = sync
-	data["admin"] = check_rights(R_ADMIN,0)
+	data["admin"] = check_rights(R_ADMIN,0,user)
 	data["disk_type"] = d_disk ? 2 : (t_disk ? 1 : 0)
 	data["category"] = selected_category
 

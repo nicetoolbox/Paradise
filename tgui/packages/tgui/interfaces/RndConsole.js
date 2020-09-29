@@ -1,12 +1,11 @@
-import { useBackend } from "../backend";
+import { useBackend, useLocalState } from "../backend";
 import { Window } from "../layouts";
-import { Button } from "../components";
+import { Button, Input } from "../components";
 
 const RndRoute = (properties, context) => {
-  const { menu: routeMenu, submenu: routeSubmenu, render } = properties;
+  const { render } = properties;
   const { data } = useBackend(context);
   const { menu, submenu } = data;
-
 
   const compare = (comparator, item) => {
     if (comparator === null || comparator === undefined) {
@@ -15,10 +14,10 @@ const RndRoute = (properties, context) => {
     if (typeof comparator === 'function') {
       return comparator(item);
     }
-    return comparator === item; // strings
+    return comparator === item; // strings or ints?
   };
 
-  let match = compare(routeMenu, menu) || compare(routeSubmenu, submenu);
+  let match = compare(properties.menu, menu) && compare(properties.submenu, submenu);
 
   if (!match) {
     return null;
@@ -240,54 +239,529 @@ const DataDiskMenu = (properties, context) => {
 };
 
 const RndNavbar = () => (
-  <RndRoute menu={n => n > 0} render={() => (
-    <>
-      <RndNavButton menu={0} submenu={0} icon="fa fa-reply" label="Main Menu" />
+  <div>
+    <RndNavButton menu={0} submenu={0} icon="fa fa-reply" label="Main Menu" />
 
-      <RndRoute menu={2} submenu={n => n > 0} render={() => (
-        <RndNavButton submenu={0} icon="fa fa-reply" label="Disk Operations Menu" />
-      )} />
+    {/* Links to return to submenu 0 for each menu other than main menu */}
+    <RndRoute submenu={n => n > 0} render={() => (
+      <>
+        <RndRoute menu={2} render={() => (
+          <RndNavButton submenu={0} icon="fa fa-reply" label="Disk Operations Menu" />
+        )} />
 
-      <RndRoute menu={4} submenu={n => n > 0} render={() => (
-        <RndNavButton submenu={0} icon="fa fa-reply" label="Protolathe Menu" />
-      )} />
+        <RndRoute menu={4} render={() => (
+          <RndNavButton submenu={0} icon="fa fa-reply" label="Protolathe Menu" />
+        )} />
 
-      <RndRoute menu={5} submenu={n => n > 0} render={() => (
-        <RndNavButton submenu={0} icon="fa fa-reply" label="Circuit Imprinter Menu" />
-      )} />
+        <RndRoute menu={5} render={() => (
+          <RndNavButton submenu={0} icon="fa fa-reply" label="Circuit Imprinter Menu" />
+        )} />
 
-      <RndRoute menu={6} submenu={n => n > 0} render={() => (
-        <RndNavButton submenu={0} icon="fa fa-reply" label="Settings Menu" />
-      )} />
+        <RndRoute menu={6} render={() => (
+          <RndNavButton submenu={0} icon="fa fa-reply" label="Settings Menu" />
+        )} />
+      </>
+    )} />
 
-      <RndRoute menu={n => n === 4 || n === 5} submenu={0} render={() => (
-        <>
-          <RndNavButton submenu={2} icon="fa fa-arrow-up" label="Material Storage" />
-          <RndNavButton submenu={3} icon="fa fa-arrow-up" label="Chemical Storage" />
-        </>
-      )} />
-    </>
-  )} />
+    <RndRoute menu={n => n === 4 || n === 5} submenu={0} render={() => (
+      <>
+        <RndNavButton submenu={2} icon="fa fa-arrow-up" label="Material Storage" />
+        <RndNavButton submenu={3} icon="fa fa-arrow-up" label="Chemical Storage" />
+      </>
+    )} />
+
+  </div>
 );
 
-export const RndConsole = (properties, context) => {
+const DeconstructionMenu = (properties, context) => {
+  const { data, act } = useBackend(context);
+
+  const {
+    loaded_item,
+    linked_destroy,
+  } = data;
+
+  if (!linked_destroy) {
+    return (
+      <div>
+        NO DESTRUCTIVE ANALYZER LINKED TO CONSOLE
+      </div>
+    );
+  }
+
+  if (!loaded_item) {
+    return (
+      <div>
+        No item loaded. Standing by...
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h3>Deconstruction Menu:</h3>
+      <div>Name: {loaded_item.name}</div>
+      <h3>Origin Tech:</h3>
+      {loaded_item.origin_tech.map(item => {
+        return (
+          <div key={item.name}>
+            <div>* {item.name}</div>
+            <div>
+              {item.object_level}
+              {item.current_level ? (
+                <>(Current: {item.current_level})</>
+              ) : null}
+            </div>
+          </div>
+        );
+      })}
+      <h3>Options:</h3>
+      <Button
+        onClick={() => {
+          act('deconstruct');
+        }}>
+        <i className="fa fa-chain-broken" />
+        Deconstruct Item
+      </Button>
+      <Button
+        onClick={() => {
+          act('eject_item');
+        }}>
+        <i className="fa fa-eject" />
+        Eject Item
+      </Button>
+    </div>
+  );
+};
+
+const LatheSearch = (properties, context) => {
+  const { act } = useBackend(context);
+
+  const [inputValue, setInputValue] = useLocalState(context, 'inputValue', '');
+
+  const onSubmit = e => {
+    e.preventDefault();
+    act('search', { to_search: inputValue });
+  };
+
+  return (
+    <form onSubmit={onSubmit}>
+      <Input
+        onInput={(e, value) => setInputValue(value)} />
+      <button type="submit">Search</button>
+    </form>
+  );
+};
+
+
+const LatheMenu = (properties, context) => {
   const { data, act } = useBackend(context);
 
   const {
     menu,
     submenu,
     category,
-    disk_data, src_ref, categories, loaded_materials, sync, admin, wait_message, loaded_item,
-    disk_type, matching_designs, loaded_chemicals,
-    to_copy,
-    linked_destroy,
+    categories, loaded_materials,
+    matching_designs, loaded_chemicals,
     total_materials,
     max_materials,
     max_chemicals,
     total_chemicals,
     linked_lathe,
     linked_imprinter,
-    tech_levels,
+  } = data;
+
+  if (menu === 4 && !linked_lathe) {
+    return (
+      <div>
+        NO PROTOLATHE LINKED TO CONSOLE
+      </div>
+    );
+  }
+
+  if (menu === 5 && !linked_imprinter) {
+    return (
+      <div>
+        NO CIRCUIT IMPRITER LINKED TO CONSOLE
+      </div>
+    );
+  }
+
+
+  return (
+    <div>
+      {submenu === 0 ? (
+        <h3>{menu === 4 ? 'Protolathe' : 'Circuit Imprinter'} Menu:</h3>
+      ) : null}
+      {submenu === 1 ? (
+        <h3>{category}</h3>
+      ) : null}
+      {submenu === 2 ? (
+        <h3>Material Stroage:</h3>
+      ) : null}
+      {submenu === 3 ? (
+        <h3>Chemical Storage:</h3>
+      ) : null}
+
+      {submenu < 2 ? (
+        <div>
+          <table>
+            <tr>
+              <td>
+                <b>Material Amount:</b>
+              </td>
+              <td>
+                {total_materials}
+              </td>
+              {max_materials ? (
+                <td>{max_materials}</td>
+              ) : null}
+            </tr>
+            <tr>
+              <td><b>Chemical Amount:</b></td>
+              <td>{total_chemicals}</td>
+              {max_chemicals ? (
+                <td>{max_chemicals}</td>
+              ) : null}
+            </tr>
+          </table>
+        </div>
+      ) : null}
+
+      {submenu === 0 ? (
+        <div>
+          <LatheSearch />
+
+          <hr />
+
+          <table>
+            {categories.map(cat => {
+              // todo flex wrap? 2 cols
+              return (
+                <tr key={cat}>
+                  <td>
+                    <Button
+                      onClick={() => {
+                        act('setCategory', { category: cat });
+                      }}>
+                      <i className="fa fa-arrow-right" />
+                      {cat}
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
+          </table>
+
+        </div>
+
+      ) : null}
+
+      {submenu === 1 ? (
+        <table>
+          {matching_designs.map(value => {
+            return (
+              <tr key={value.id}>
+                <td>
+                  <Button
+                    disabled={!value.can_build}
+                    onClick={() => {
+                      if (data.menu === 4) {
+                        act('build', { id: value.id, amount: 1 });
+                      } else {
+                        act('imprint', { id: value.id });
+                      }
+                    }}>
+                    <i className="fa fa-print" />
+                    {value.name}
+                  </Button>
+                </td>
+                <td>
+                  {value.can_build >= 5 ? (
+                    <Button
+                      onClick={() => {
+                        if (data.menu === 4) {
+                          act('build', { id: value.id, amount: 5 });
+                        } else {
+                          act('imprint', { id: value.id }); // dead code path?
+                        }
+                      }}>
+                      <i className="fa fa-print" />
+                      x5
+                    </Button>
+                  ) : null}
+                </td>
+                <td>
+                  {value.can_build >= 10 ? (
+                    <Button
+                      onClick={() => {
+                        if (data.menu === 4) {
+                          act('build', { id: value.id, amount: 10 });
+                        } else {
+                          act('imprint', { id: value.id }); // dead code path?
+                        }
+                      }}>
+                      <i className="fa fa-print" />
+                      x10
+                    </Button>
+                  ) : null}
+                </td>
+                <td>
+                  {value.materials.map(mat => {
+                    return (
+                      <>
+                        |
+                        <span className={mat.is_red ? 'bad' : null}>
+                          {mat.amount} {mat.name}
+                        </span>
+
+                      </>
+                    );
+                  })}
+                </td>
+
+
+              </tr>
+            );
+          })}
+        </table>
+      ) : null}
+
+      {submenu === 2 ? (
+        <div>
+          {loaded_materials.map(value => {
+            const eject = amount => {
+              if (data.menu === 4) {
+                act('lathe_ejectsheet', { id: value.id, amount });
+              } else {
+                act('imprinter_ejectsheet', { id: value.id, amount });
+              }
+            };
+            return (
+              <div key={value.id}>
+                <div>* {value.amount} of {value.name}</div>
+                <div>({Math.round((value.amount / 2000) * 10) / 10} sheets)</div>
+                {value.amount >= 2000 ? (
+                  <div>
+                    <Button onClick={() => {
+                      eject(1);
+                    }}>
+                      <i className="fa fa-eject" />
+                      1x
+                    </Button>
+                    <Button onClick={() => {
+                      eject('custom'); // todo!!
+                    }}>
+                      <i className="fa fa-eject" />
+                      C (TODO!!)
+                    </Button>
+                    {value.amount >= 2000 * 5 ? (
+
+                      <Button onClick={() => {
+                        eject(5);
+                      }}>
+                        <i className="fa fa-eject" />
+                        5x
+                      </Button>
+                    ) : null}
+
+                    <Button onClick={() => {
+                      eject(50);
+                    }}>
+                      <i className="fa fa-eject" />
+                      All
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {submenu === 3 ? (
+        <div>
+
+          <Button onClick={() => {
+            if (data.menu === 4) {
+              act('disposeallP');
+            } else {
+              act('disposeallI');
+            }
+          }}>
+            <i className="fa fa-trash" />
+            Purge All
+          </Button>
+
+          {loaded_chemicals.map(value => {
+
+            return (
+              <div key={value.id}>
+                <div>* {value.volume} of {value.name}</div>
+                <Button onClick={() => {
+                  if (data.menu === 4) {
+                    act('disposeP', { id: value.id });
+                  } else {
+                    act('disposeI', { id: value.id });
+                  }
+                }}>
+                  <i className="fa fa-trash" />
+                  Purge
+                </Button>
+              </div>
+            );
+          })}
+
+        </div>
+      ) : null}
+
+
+    </div>
+  );
+};
+
+const SettingsMenu = (properties, context) => {
+  const { data, act } = useBackend(context);
+
+  const {
+    sync,
+    admin,
+    linked_destroy,
+    linked_lathe,
+    linked_imprinter,
+  } = data;
+
+  return (
+    <div>
+      <RndRoute submenu={0} render={() => (
+        <div>
+          <h3>Settings:</h3>
+          <div>
+            <Button
+              disabled={!sync}
+              onClick={() => {
+                act('sync');
+              }}>
+              <i className="fa fa-refresh" />
+              Sync Database with Network
+            </Button>
+
+            <Button
+              selected={sync}
+              onClick={() => {
+                act('togglesync');
+              }}>
+              <i className="fa fa-plug" />
+              Connect to Research Network
+            </Button>
+
+            <Button
+              selected={!sync}
+              onClick={() => {
+                act('togglesync');
+              }}>
+              <i className="fa fa-chain-broken" />
+              Disconnect from Research Network
+            </Button>
+
+            <Button
+              disabled={!sync}
+              onClick={() => {
+                act('nav', { menu: 6, submenu: 1 });
+              }}>
+              <i className="fa fa-chain" />
+              Device Linkage Menu
+            </Button>
+
+            {admin === 1 ? (
+              <Button onClick={() => {
+                act('maxresearch');
+              }}>
+                <i className="fa fa-exclamation" />
+                [ADMIN] Maximize Research Levels
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      )} />
+
+      <RndRoute submenu={1} render={() => (
+        <div>
+          <h3>Device Linkage Menu:</h3>
+          <div>
+            <Button onClick={() => {
+              act('find_device');
+            }}>
+              <i className="fa fa-chain" />
+              Re-sync with Nearby Devices
+            </Button>
+          </div>
+          <h3>Linked Devices:</h3>
+          <div>
+            {linked_destroy ? (
+              <>
+                <div className="itemLabel">* Destructive Analyzer</div>
+                <Button onClick={() => {
+                  act('disconnect', { item: 'destroy' });
+                }}>
+                  <i className="fa fa-chain-broken" />
+                  Unlink
+                </Button>
+              </>
+            ) : (
+              <div>
+                * No Destructive Analyzer Linked
+              </div>
+            )}
+          </div>
+          <div>
+            {linked_lathe ? (
+              <>
+                <div className="itemLabel">* Protolathe</div>
+                <Button onClick={() => {
+                  act('disconnect', { item: 'lathe' });
+                }}>
+                  <i className="fa fa-chain-broken" />
+                  Unlink
+                </Button>
+              </>
+            ) : (
+              <div>
+                * No Protolathe Linked
+              </div>
+            )}
+
+          </div>
+          <div>
+            {linked_imprinter ? (
+              <>
+                <div className="itemLabel">* Circuit Imprinter</div>
+                <Button onClick={() => {
+                  act('disconnect', { item: 'imprinter' });
+                }}>
+                  <i className="fa fa-chain-broken" />
+                  Unlink
+                </Button>
+              </>
+            ) : (
+              <div>
+                * No Circuit Imprinter Linked
+              </div>
+            )}
+
+          </div>
+
+        </div>
+      )} />
+    </div>
+  );
+};
+
+export const RndConsole = (properties, context) => {
+  const { data } = useBackend(context);
+
+  const {
+    wait_message,
   } = data;
 
 
@@ -297,434 +771,21 @@ export const RndConsole = (properties, context) => {
 
         <RndNavbar />
 
-        <div className="statusDisplay">
 
-          <RndRoute menu={0} render={() => <MainMenu />} />
-          <RndRoute menu={1} render={() => <CurrentLevels />} />
-          <RndRoute menu={2} render={() => <DataDiskMenu />} />
+        <RndRoute menu={0} render={() => <MainMenu />} />
+        <RndRoute menu={1} render={() => <CurrentLevels />} />
+        <RndRoute menu={2} render={() => <DataDiskMenu />} />
+        <RndRoute menu={3} render={() => <DeconstructionMenu />} />
+        <RndRoute menu={n => n === 4 || n === 5} render={() => <LatheMenu />} />
+        <RndRoute menu={6} render={() => <SettingsMenu />} />
 
-          {menu === 3 && !linked_destroy ? (
-            <p>NO DESTRUCTIVE ANALYZER LINKED TO CONSOLE</p>
-          ) : null}
-
-          {menu === 4 && !linked_lathe ? (
-            <p>NO PROTOLATHE LINKED TO CONSOLE</p>
-          ) : null}
-
-          {menu === 5 && !linked_imprinter ? (
-            <p>NO CIRCUIT IMPRITER LINKED TO CONSOLE</p>
-          ) : null}
-
-          {menu === 3 && linked_destroy ? (
-            loaded_item ? (
-              <>
-                <h3>Deconstruction Menu:</h3>
-                <div>Name: {loaded_item.name}</div>
-                <h3>Origin Tech:</h3>
-                {loaded_item.origin_tech.map(item => {
-                  return (
-                    <div key={item.name}>
-                      <div>* {item.name}</div>
-                      <div>
-                        {item.object_level}
-                        {item.current_level ? (
-                          <>(Current: {item.current_level})</>
-                        ) : null}
-                      </div>
-                    </div>
-                  );
-                })}
-                <h3>Options:</h3>
-                <Button
-                  onClick={() => {
-                    act('deconstruct');
-                  }}>
-                  <i className="fa fa-chain-broken" />
-                  Deconstruct Item
-                </Button>
-                <Button
-                  onClick={() => {
-                    act('eject_item');
-                  }}>
-                  <i className="fa fa-eject" />
-                  Eject Item
-                </Button>
-
-              </>
-            ) : (
-              <p>No item loaded. Standing by...</p>
-            )
-          ) : null}
-
-          {(menu === 4 && linked_lathe) || (menu === 5 && linked_imprinter) ? (
+        {wait_message ? (
+          <div>
             <div>
-              {submenu === 0 ? (
-                <h3>{menu === 4 ? 'Protolathe' : 'Circuit Imprinter'} Menu:</h3>
-              ) : null}
-              {submenu === 1 ? (
-                <h3>{category}</h3>
-              ) : null}
-              {submenu === 2 ? (
-                <h3>Material Stroage:</h3>
-              ) : null}
-              {submenu === 3 ? (
-                <h3>Chemical Storage:</h3>
-              ) : null}
-
-              {submenu < 2 ? (
-                <div>
-                  <table>
-                    <tr>
-                      <td>
-                        <b>Material Amount:</b>
-                      </td>
-                      <td>
-                        {total_materials}
-                      </td>
-                      {max_materials ? (
-                        <td>{max_materials}</td>
-                      ) : null}
-                    </tr>
-                    <tr>
-                      <td><b>Chemical Amount:</b></td>
-                      <td>{total_chemicals}</td>
-                      {max_chemicals ? (
-                        <td>{max_chemicals}</td>
-                      ) : null}
-                    </tr>
-                  </table>
-                </div>
-              ) : null}
-
-              {submenu === 0 ? (
-                <div>
-                  <form action="byond://">
-                    <input type="hidden" name="src" value={src_ref} />
-                    <input type="hidden" name="search" value="1" />
-                    <input type="text" name="to_search" />
-                    <input type="submit" value="Search" />
-                  </form>
-
-                  <hr />
-
-                  <table>
-                    {categories.map(cat => {
-                      // todo flex wrap? 2 cols
-                      return (
-                        <tr key={cat}>
-                          <td>
-                            <Button
-                              onClick={() => {
-                                act('setCategory', { category: cat });
-                              }}>
-                              <i className="fa fa-arrow-right" />
-                              {cat}
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </table>
-
-                </div>
-
-              ) : null}
-
-              {submenu === 1 ? (
-                <table>
-                  {matching_designs.map(value => {
-                    return (
-                      <tr key={value.id}>
-                        <td>
-                          <Button
-                            disabled={!value.can_build}
-                            onClick={() => {
-                              if (data.menu === 4) {
-                                act('build', { id: value.id, amount: 1 });
-                              } else {
-                                act('imprint', { id: value.id });
-                              }
-                            }}>
-                            <i className="fa fa-print" />
-                            {value.name}
-                          </Button>
-                        </td>
-                        <td>
-                          {value.can_build >= 5 ? (
-                            <Button
-                              onClick={() => {
-                                if (data.menu === 4) {
-                                  act('build', { id: value.id, amount: 5 });
-                                } else {
-                                  act('imprint', { id: value.id }); // dead code path?
-                                }
-                              }}>
-                              <i className="fa fa-print" />
-                              x5
-                            </Button>
-                          ) : null}
-                        </td>
-                        <td>
-                          {value.can_build >= 10 ? (
-                            <Button
-                              onClick={() => {
-                                if (data.menu === 4) {
-                                  act('build', { id: value.id, amount: 10 });
-                                } else {
-                                  act('imprint', { id: value.id }); // dead code path?
-                                }
-                              }}>
-                              <i className="fa fa-print" />
-                              x10
-                            </Button>
-                          ) : null}
-                        </td>
-                        <td>
-                          {value.materials.map(mat => {
-                            return (
-                              <>
-                                |
-                                <span className={mat.is_red ? 'bad' : null}>
-                                  {mat.amount} {mat.name}
-                                </span>
-
-                              </>
-                            );
-                          })}
-                        </td>
-
-
-                      </tr>
-                    );
-                  })}
-                </table>
-              ) : null}
-
-              {submenu === 2 ? (
-                <div>
-                  {loaded_materials.map(value => {
-                    const eject = amount => {
-                      if (data.menu === 4) {
-                        act('lathe_ejectsheet', { id: value.id, amount });
-                      } else {
-                        act('imprinter_ejectsheet', { id: value.id, amount });
-                      }
-                    };
-                    return (
-                      <div key={value.id}>
-                        <div>* {value.amount} of {value.name}</div>
-                        <div>({Math.round((value.amount / 2000) * 10) / 10} sheets)</div>
-                        {value.amount >= 2000 ? (
-                          <div>
-                            <Button onClick={() => {
-                              eject(1);
-                            }}>
-                              <i className="fa fa-eject" />
-                              1x
-                            </Button>
-                            <Button onClick={() => {
-                              eject('custom'); // todo!!
-                            }}>
-                              <i className="fa fa-eject" />
-                              C (TODO!!)
-                            </Button>
-                            {value.amount >= 2000 * 5 ? (
-
-                              <Button onClick={() => {
-                                eject(5);
-                              }}>
-                                <i className="fa fa-eject" />
-                                5x
-                              </Button>
-                            ) : null}
-
-                            <Button onClick={() => {
-                              eject(50);
-                            }}>
-                              <i className="fa fa-eject" />
-                              All
-                            </Button>
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : null}
-
-              {submenu === 3 ? (
-                <div>
-
-                  <Button onClick={() => {
-                    if (data.menu === 4) {
-                      act('disposeallP');
-                    } else {
-                      act('disposeallI');
-                    }
-                  }}>
-                    <i className="fa fa-trash" />
-                    Purge All
-                  </Button>
-
-                  {loaded_chemicals.map(value => {
-
-                    return (
-                      <div key={value.id}>
-                        <div>* {value.volume} of {value.name}</div>
-                        <Button onClick={() => {
-                          if (data.menu === 4) {
-                            act('disposeP', { id: value.id });
-                          } else {
-                            act('disposeI', { id: value.id });
-                          }
-                        }}>
-                          <i className="fa fa-trash" />
-                          Purge
-                        </Button>
-                      </div>
-                    );
-                  })}
-
-                </div>
-              ) : null}
-
-
+              <h1>{wait_message}</h1>
             </div>
-          ) : null}
-
-          {menu === 6 ? (
-            <div>
-              {submenu === 0 ? (
-                <div>
-                  <h3>Settings:</h3>
-                  <div>
-                    <Button
-                      disabled={!sync}
-                      onClick={() => {
-                        act('sync');
-                      }}>
-                      <i className="fa fa-refresh" />
-                      Sync Database with Network
-                    </Button>
-
-                    <Button
-                      selected={sync}
-                      onClick={() => {
-                        act('togglesync');
-                      }}>
-                      <i className="fa fa-plug" />
-                      Connect to Research Network
-                    </Button>
-
-                    <Button
-                      selected={!sync}
-                      onClick={() => {
-                        act('togglesync');
-                      }}>
-                      <i className="fa fa-chain-broken" />
-                      Disconnect from Research Network
-                    </Button>
-
-                    <Button
-                      disabled={!sync}
-                      onClick={() => {
-                        act('nav', { menu: 6, submenu: 1 });
-                      }}>
-                      <i className="fa fa-chain" />
-                      Device Linkage Menu
-                    </Button>
-
-                    {admin ? (
-                      <Button onClick={() => {
-                        act('maxresearch');
-                      }}>
-                        <i className="fa fa-exclamation" />
-                        [ADMIN] Maximize Research Levels
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-              {submenu === 1 ? (
-                <div>
-                  <h3>Device Linkage Menu:</h3>
-                  <div>
-                    <Button onClick={() => {
-                      act('find_device');
-                    }}>
-                      <i className="fa fa-chain" />
-                      Re-sync with Nearby Devices
-                    </Button>
-                  </div>
-                  <h3>Linked Devices:</h3>
-                  <div>
-                    {linked_destroy ? (
-                      <>
-                        <div className="itemLabel">* Destructive Analyzer</div>
-                        <Button onClick={() => {
-                          act('disconnect', { item: 'destroy' });
-                        }}>
-                          <i className="fa fa-chain-broken" />
-                          Unlink
-                        </Button>
-                      </>
-                    ) : (
-                      <div>
-                        * No Destructive Analyzer Linked
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    {linked_lathe ? (
-                      <>
-                        <div className="itemLabel">* Protolathe</div>
-                        <Button onClick={() => {
-                          act('disconnect', { item: 'lathe' });
-                        }}>
-                          <i className="fa fa-chain-broken" />
-                          Unlink
-                        </Button>
-                      </>
-                    ) : (
-                      <div>
-                        * No Protolathe Linked
-                      </div>
-                    )}
-
-                  </div>
-                  <div>
-                    {linked_imprinter ? (
-                      <>
-                        <div className="itemLabel">* Circuit Imprinter</div>
-                        <Button onClick={() => {
-                          act('disconnect', { item: 'imprinter' });
-                        }}>
-                          <i className="fa fa-chain-broken" />
-                          Unlink
-                        </Button>
-                      </>
-                    ) : (
-                      <div>
-                        * No Circuit Imprinter Linked
-                      </div>
-                    )}
-
-                  </div>
-
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          {wait_message ? (
-            <div>
-              <div>
-                <h1>{wait_message}</h1>
-              </div>
-            </div>
-          ) : null}
-
-        </div>
+          </div>
+        ) : null}
 
       </Window.Content>
 
