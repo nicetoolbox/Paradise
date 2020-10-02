@@ -47,7 +47,8 @@ GLOBAL_LIST_INIT(role_playtime_requirements, list(
 		to_chat(src, "<span class='warning'>Playtime tracking is not enabled.</span>")
 		return
 
-	to_chat(src, "<span class='notice'>Your [EXP_TYPE_CREW] playtime is [get_exp_type(EXP_TYPE_CREW)].</span>")
+	for(var/exp_type in EXP_DEPT_TYPE_LIST)
+		to_chat(src, "<span class='notice'>Your [exp_type] playtime is [get_exp_type(exp_type)].</span>")
 
 // Admin Verbs
 
